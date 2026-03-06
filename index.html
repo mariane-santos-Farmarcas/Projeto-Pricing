@@ -1,69 +1,296 @@
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matriz de Acompanhamento - Pricing</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-slate-50 font-sans text-slate-800">
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyD2IxR0rWy8J72SVC0HkvCMORbOvGn3OqE",
-    authDomain: "projeto-pricing-5c557.firebaseapp.com",
-    projectId: "projeto-pricing-5c557",
-    storageBucket: "projeto-pricing-5c557.firebasestorage.app",
-    messagingSenderId: "106366028569",
-    appId: "1:106366028569:web:e15bd7ca3382cc432a1388"
-  };
+    <div id="root">
+        <div class="flex items-center justify-center min-h-screen">
+            <p class="text-slate-500 animate-pulse">Conectando ao Firebase...</p>
+        </div>
+    </div>
 
-  // Inicializar Firebase e Firestore
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const docRef = doc(db, "projeto_pricing", "dados");
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
-  // --- ESTADO GLOBAL (agora sincronizado) ---
-  window.activeTab = 'pautas';
-  window.filterStatus = '';
-  window.filterResponsavel = '';
-  window.filterGE = '';
-  
-  window.rules = [];
-  window.actions = [];
-  window.associates = [];
+        const firebaseConfig = {
+            apiKey: "AIzaSyD2IxR0rWy8J72SVC0HkvCMORbOvGn3OqE",
+            authDomain: "projeto-pricing-5c557.firebaseapp.com",
+            projectId: "projeto-pricing-5c557",
+            storageBucket: "projeto-pricing-5c557.firebasestorage.app",
+            messagingSenderId: "106366028569",
+            appId: "1:106366028569:web:e15bd7ca3382cc432a1388"
+        };
 
-  // --- FUNÇÃO PARA SALVAR NO FIREBASE ---
-  // Chamamos essa função sempre que um dado for alterado
-  window.saveToFirebase = async () => {
-    try {
-      await setDoc(docRef, {
-        rules: window.rules,
-        actions: window.actions,
-        associates: window.associates
-      });
-    } catch (e) {
-      console.error("Erro ao salvar: ", e);
-    }
-  };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const docRef = doc(db, "projeto_pricing", "dados_gerais");
 
-  // --- ESCUTAR MUDANÇAS EM TEMPO REAL ---
-  // Quando o banco muda, o app renderiza sozinho
-  onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      window.rules = data.rules || [];
-      window.actions = data.actions || [];
-      window.associates = data.associates || [];
-      render(); // Chama sua função de renderização
-    } else {
-      // Se o documento não existir, salva o estado inicial
-      saveToFirebase();
-    }
-  });
+        // --- ESTADO DA APLICAÇÃO ---
+        window.activeTab = 'pautas';
+        window.filterStatus = '';
+        window.filterResponsavel = '';
+        window.filterGE = '';
+        window.rules = [];
+        window.actions = [];
+        window.associates = [];
 
-  // --- REESCREVENDO SUAS FUNÇÕES PARA USAR O FIREBASE ---
+        // --- SINCRONIZAÇÃO EM TEMPO REAL ---
+        onSnapshot(docRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+                window.rules = data.rules || [];
+                window.actions = data.actions || [];
+                window.associates = data.associates || [];
+                render();
+            } else {
+                // Inicializa o banco se estiver vazio
+                saveData();
+            }
+        });
 
-  window.switchTab = (tab) => {
-    window.activeTab = tab;
-    render();
-  };
+        // --- FUNÇÃO PARA SALVAR ---
+        async function saveData() {
+            try {
+                await setDoc(docRef, {
+                    rules: window.rules,
+                    actions: window.actions,
+                    associates: window.associates
+                });
+            } catch (e) {
+                console.error("Erro ao salvar:", e);
+            }
+        }
 
-  window.updateTextState = (type, id, field, element) => {
-    const value = element.value;
-    let targetList = window[type];
-    const item = targetList.find(i => i.id === id);
-    if (item) {
+        // --- FUNÇÕES DE INTERAÇÃO (Disponibilizadas globalmente) ---
+        window.switchTab = (tab) => { window.activeTab = tab; render(); };
+        
+        window.updateFilter = (field, value) => {
+            if (field === 'status') window.filterStatus = value;
+            if (field === 'responsavel') window.filterResponsavel = value;
+            if (field === 'ge') window.filterGE = value;
+            render();
+        };
+
+        window.updateTextState = (type, id, field, element) => {
+            const item = window[type].find(i => i.id === id);
+            if (item) {
+                item[field] = element.value;
+                saveData(); // Salva no Firebase a cada alteração
+            }
+        };
+
+        window.updateSelectAndRender = (type, id, field, element) => {
+            window.updateTextState(type, id, field, element);
+        };
+
+        window.addRule = () => {
+            window.rules.push({ id: Date.now(), title: 'Nova Premissa', desc: 'Descrição...' });
+            saveData();
+        };
+
+        window.removeRule = (id) => {
+            window.rules = window.rules.filter(r => r.id !== id);
+            saveData();
+        };
+
+        window.addAction = () => {
+            window.actions.push({ id: Date.now(), category: 'Geral', title: 'Nova Pauta', desc: 'Detalhes...', priority: 'Média', responsavel: 'A definir', status: 'Pendente' });
+            saveData();
+        };
+
+        window.removeAction = (id) => {
+            window.actions = window.actions.filter(a => a.id !== id);
+            saveData();
+        };
+
+        window.addAssociate = () => {
+            window.associates.push({ id: Date.now(), ge: '', nome: '', cnpjs: '', fase: 'Mapeamento' });
+            saveData();
+        };
+
+        window.removeAssociate = (id) => {
+            window.associates = window.associates.filter(a => a.id !== id);
+            saveData();
+        };
+
+        window.autoResize = function(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        };
+
+        // --- RENDERIZAÇÃO ---
+        const getStatusStyle = (status) => {
+            switch (status) {
+                case 'Em Andamento': return 'bg-blue-100 text-blue-700 border-blue-200';
+                case 'Concluído': return 'bg-green-100 text-green-700 border-green-200';
+                case 'Mapear': return 'bg-purple-100 text-purple-700 border-purple-200';
+                default: return 'bg-slate-100 text-slate-700 border-slate-200';
+            }
+        };
+
+        const getPriorityStyle = (priority) => {
+            switch (priority) {
+                case 'Alta': return 'text-red-600 bg-red-50 font-bold border-red-100';
+                case 'Média': return 'text-amber-600 bg-amber-50 font-bold border-amber-100';
+                default: return 'text-slate-600 bg-slate-50 border-slate-100';
+            }
+        };
+
+        const getPhaseStyle = (fase) => {
+            switch (fase) {
+                case 'Mapeamento': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+                case 'Implantação': return 'bg-blue-100 text-blue-700 border-blue-200';
+                case 'Em Pesquisa': return 'bg-purple-100 text-purple-700 border-purple-200';
+                case 'Implantado': return 'bg-green-100 text-green-700 border-green-200';
+                default: return 'bg-slate-100 text-slate-700 border-slate-200';
+            }
+        };
+
+        const escapeHTML = (str) => str ? str.toString().replace(/"/g, '&quot;') : '';
+
+        function render() {
+            const root = document.getElementById('root');
+            const emAnaliseCount = window.actions.filter(i => i.status === 'Em Andamento' || i.status === 'Mapear').length;
+
+            let html = `
+                <div class="min-h-screen p-2 md:p-4 w-full">
+                    <div class="max-w-[1800px] mx-auto mb-6 bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8">
+                        <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div class="flex items-center gap-3">
+                                <div class="p-3 bg-blue-600 rounded-lg text-white"><i data-lucide="target"></i></div>
+                                <h1 class="text-2xl font-bold text-slate-900">Matriz de Acompanhamento: Projeto Pricing</h1>
+                            </div>
+                            <div class="flex gap-4">
+                                <div class="text-center px-4 py-2 bg-slate-50 rounded-lg border">
+                                    <span class="block text-2xl font-bold text-blue-600">${window.actions.length}</span>
+                                    <span class="text-xs text-slate-500 uppercase font-semibold">Pautas</span>
+                                </div>
+                                <div class="text-center px-4 py-2 bg-slate-50 rounded-lg border">
+                                    <span class="block text-2xl font-bold text-orange-500">${emAnaliseCount}</span>
+                                    <span class="text-xs text-slate-500 uppercase font-semibold">Em Análise</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="max-w-[1800px] mx-auto mb-6 flex gap-4 border-b border-slate-200 px-2">
+                        <button onclick="switchTab('pautas')" class="pb-3 flex items-center gap-2 font-semibold text-sm border-b-2 ${window.activeTab === 'pautas' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'}">
+                            <i data-lucide="layout-list" class="w-5 h-5"></i> Pautas & Premissas
+                        </button>
+                        <button onclick="switchTab('piloto')" class="pb-3 flex items-center gap-2 font-semibold text-sm border-b-2 ${window.activeTab === 'piloto' ? 'border-purple-600 text-purple-600' : 'border-transparent text-slate-500'}">
+                            <i data-lucide="store" class="w-5 h-5"></i> Lojas Piloto
+                        </button>
+                    </div>
+                    ${window.activeTab === 'pautas' ? renderPautasView() : renderPilotoView()}
+                </div>`;
+
+            root.innerHTML = html;
+            lucide.createIcons();
+            document.querySelectorAll('.auto-resize').forEach(el => window.autoResize(el));
+        }
+
+        function renderPautasView() {
+            let filteredActions = window.actions.filter(item => {
+                const matchStatus = window.filterStatus === '' || item.status === window.filterStatus;
+                const matchResp = window.filterResponsavel === '' || item.responsavel.toLowerCase().includes(window.filterResponsavel.toLowerCase());
+                return matchStatus && matchResp;
+            });
+
+            return `
+                <div class="max-w-[1800px] mx-auto grid grid-cols-1 xl:grid-cols-4 gap-6">
+                    <div class="xl:col-span-1 space-y-4">
+                        <div class="bg-white rounded-2xl p-5 border shadow-sm">
+                            <h2 class="text-sm font-bold text-slate-400 uppercase mb-4">Premissas</h2>
+                            ${window.rules.map(rule => `
+                                <div class="p-3 bg-blue-50/50 rounded-xl border mb-3 relative group">
+                                    <button onclick="removeRule(${rule.id})" class="absolute top-2 right-2 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                    <textarea oninput="updateTextState('rules', ${rule.id}, 'title', this)" class="auto-resize font-semibold text-blue-900 w-full bg-transparent outline-none resize-none">${escapeHTML(rule.title)}</textarea>
+                                    <textarea oninput="updateTextState('rules', ${rule.id}, 'desc', this)" class="auto-resize text-sm text-blue-800/70 w-full bg-transparent outline-none resize-none">${escapeHTML(rule.desc)}</textarea>
+                                </div>`).join('')}
+                            <button onclick="addRule()" class="w-full py-2 text-blue-600 bg-blue-50 rounded-lg text-sm font-bold">+ Adicionar</button>
+                        </div>
+                    </div>
+                    <div class="xl:col-span-3">
+                        <div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                            <div class="p-5 border-b bg-slate-50/50 flex justify-between items-center">
+                                <h2 class="font-bold">Plano de Ação</h2>
+                                <div class="flex gap-2">
+                                    <input type="text" oninput="updateFilter('responsavel', this.value)" placeholder="Filtrar responsável..." class="text-sm border rounded-lg px-3 py-1 outline-none" value="${escapeHTML(window.filterResponsavel)}">
+                                </div>
+                            </div>
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-white border-b text-slate-500">
+                                    <tr>
+                                        <th class="p-4">Tópico</th>
+                                        <th class="p-4">Prioridade</th>
+                                        <th class="p-4">Status</th>
+                                        <th class="p-4"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${filteredActions.map(item => `
+                                        <tr class="border-b">
+                                            <td class="p-4"><textarea oninput="updateTextState('actions', ${item.id}, 'title', this)" class="auto-resize w-full font-bold bg-transparent outline-none resize-none">${escapeHTML(item.title)}</textarea></td>
+                                            <td class="p-4">
+                                                <select onchange="updateSelectAndRender('actions', ${item.id}, 'priority', this)" class="p-1 rounded border ${getPriorityStyle(item.priority)}">
+                                                    <option value="Alta" ${item.priority === 'Alta' ? 'selected' : ''}>Alta</option>
+                                                    <option value="Média" ${item.priority === 'Média' ? 'selected' : ''}>Média</option>
+                                                </select>
+                                            </td>
+                                            <td class="p-4">
+                                                <select onchange="updateSelectAndRender('actions', ${item.id}, 'status', this)" class="p-1 rounded-full border ${getStatusStyle(item.status)}">
+                                                    <option value="Pendente" ${item.status === 'Pendente' ? 'selected' : ''}>Pendente</option>
+                                                    <option value="Em Andamento" ${item.status === 'Em Andamento' ? 'selected' : ''}>Em Andamento</option>
+                                                    <option value="Concluído" ${item.status === 'Concluído' ? 'selected' : ''}>Concluído</option>
+                                                </select>
+                                            </td>
+                                            <td class="p-4"><button onclick="removeAction(${item.id})" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                                        </tr>`).join('')}
+                                </tbody>
+                            </table>
+                            <div class="p-4 flex justify-center border-t"><button onclick="addAction()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Adicionar Pauta</button></div>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderPilotoView() {
+            let filteredAssociates = window.associates.filter(item => window.filterGE === '' || item.ge.toLowerCase().includes(window.filterGE.toLowerCase()));
+            return `
+                <div class="max-w-[1800px] mx-auto bg-white rounded-2xl border shadow-sm overflow-hidden">
+                    <div class="p-5 border-b flex justify-between items-center">
+                        <h2 class="font-bold">Lojas Participantes</h2>
+                        <input type="text" oninput="updateFilter('ge', this.value)" placeholder="Filtrar G.E..." class="text-sm border rounded-lg px-3 py-1" value="${escapeHTML(window.filterGE)}">
+                    </div>
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-50 text-slate-500 border-b">
+                            <tr><th class="p-4">G.E</th><th class="p-4">Associado</th><th class="p-4">Fase</th><th class="p-4"></th></tr>
+                        </thead>
+                        <tbody>
+                            ${filteredAssociates.map(item => `
+                                <tr class="border-b">
+                                    <td class="p-4"><input oninput="updateTextState('associates', ${item.id}, 'ge', this)" value="${escapeHTML(item.ge)}" class="font-bold outline-none uppercase bg-transparent"></td>
+                                    <td class="p-4"><input oninput="updateTextState('associates', ${item.id}, 'nome', this)" value="${escapeHTML(item.nome)}" class="outline-none bg-transparent"></td>
+                                    <td class="p-4">
+                                        <select onchange="updateSelectAndRender('associates', ${item.id}, 'fase', this)" class="p-1 rounded-full border ${getPhaseStyle(item.fase)}">
+                                            <option value="Mapeamento" ${item.fase === 'Mapeamento' ? 'selected' : ''}>Mapeamento</option>
+                                            <option value="Implantação" ${item.fase === 'Implantação' ? 'selected' : ''}>Implantação</option>
+                                        </select>
+                                    </td>
+                                    <td class="p-4"><button onclick="removeAssociate(${item.id})" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="w-4 h-4"></i></button></td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                    <div class="p-4 flex justify-center"><button onclick="addAssociate()" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Adicionar Loja</button></div>
+                </div>`;
+        }
+    </script>
+</body>
+</html>
